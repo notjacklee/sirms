@@ -14,20 +14,28 @@ class DatabaseSeeder extends Seeder
             StatusSeeder::class,
         ]);
 
-        // admin
-        User::factory()->create([
+        // Admin
+        User::create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => Hash::make('password123'),
             'role' => 'admin',
         ]);
 
-        // reporter
-        User::factory()->create([
+        // Reporter
+        User::create([
             'name' => 'Reporter',
             'email' => 'reporter@example.com',
             'password' => Hash::make('password123'),
             'role' => 'reporter',
+        ]);
+
+        // Officer
+        User::create([
+            'name' => 'Officer',
+            'email' => 'officer@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'officer',
         ]);
     }
 }

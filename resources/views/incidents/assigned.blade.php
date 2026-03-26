@@ -90,9 +90,8 @@
                             $statusName = trim($incident->status->name ?? 'Unknown');
 
                             $allowedTransitions = [
-                                'New' => ['In Review'],
-                                'In Review' => ['Assigned'],
-                                'Assigned' => ['Resolved'],
+                                'Assigned' => ['In Review'],
+                                'In Review' => ['Resolved'],
                                 'Resolved' => ['Closed'],
                                 'Closed' => [],
                                 'Invalid' => [],
@@ -143,7 +142,7 @@
                                         {{ $statusName }}
                                     </span>
                                 @elseif($statusName === 'Assigned')
-                                    <span class="inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                    <span class="inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
                                         {{ $statusName }}
                                     </span>
                                 @elseif($statusName === 'Resolved')
@@ -151,7 +150,7 @@
                                         {{ $statusName }}
                                     </span>
                                 @elseif($statusName === 'Closed')
-                                    <span class="inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                                    <span class="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
                                         {{ $statusName }}
                                     </span>
                                 @elseif($statusName === 'Invalid')

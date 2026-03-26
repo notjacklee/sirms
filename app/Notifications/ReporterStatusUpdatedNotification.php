@@ -26,14 +26,17 @@ class ReporterStatusUpdatedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $url = route('incidents.show', $this->incident);
+
         return (new MailMessage)
-            ->subject('Incident Status Updated')
-            ->greeting('Hello ' . $notifiable->name . '!')
-            ->line('The status of your reported incident has been updated.')
-            ->line('Incident Title: ' . $this->incident->title)
-            ->line('New Status: ' . $this->statusName)
-            ->action('View Incident', route('incidents.show', $this->incident))
-            ->line('Thank you for using SIRMS.');
+            ->subject('SIRMS Notification: Incident Status Updated')
+            ->view('emails.reporter-status-updated', [
+                'notifiable' => $notifiable,
+                'incident' => $this->incident,
+                'statusName' => $this->statusName,
+                'url' => $url,
+                'updatedAt' => now()->format('d M Y, h:i A'),
+            ]);
     }
 
     public function toArray(object $notifiable): array
@@ -41,7 +44,7 @@ class ReporterStatusUpdatedNotification extends Notification
         return [
             'incident_id' => $this->incident->id,
             'status' => $this->statusName,
-            'message' => 'Your incident status has been updated.',
+            'message' => 'Your reported incident status has been updated to ' . $this->statusName . '.',
         ];
     }
 }

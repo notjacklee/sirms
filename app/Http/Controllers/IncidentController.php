@@ -70,65 +70,65 @@ class IncidentController extends Controller
         return view('incidents.create');
     }
 
-   public function store(Request $request)
-{
-    $data = $request->validate([
-        'title' => 'required|string|max:200|unique:incidents,title',
-        'category' => 'required|string|max:100',
-        'severity' => 'required|string',
-        'description' => 'required|string',
-        'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:5120',
-    ]);
-
-    return DB::transaction(function () use ($request, $data) {
-        $statusNew = Status::firstOrCreate(['name' => 'New']);
-
-        $incident = Incident::create([
-            'title' => $data['title'],
-            'category' => $data['category'],
-            'severity' => $data['severity'],
-            'description' => $data['description'],
-            'status_id' => $statusNew->id,
-            'reporter_id' => auth()->id(),
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'title' => 'required|string|max:200|unique:incidents,title',
+            'category' => 'required|string|max:100',
+            'severity' => 'required|string',
+            'description' => 'required|string',
+            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:5120',
         ]);
 
-        $incident->load('reporter');
+        return DB::transaction(function () use ($request, $data) {
+            $statusNew = Status::firstOrCreate(['name' => 'New']);
 
-        User::where('role', 'admin')->each(function (User $admin) use ($incident) {
-            $admin->notify(new NewIncidentReportedNotification($incident));
-        });
-
-        if ($request->hasFile('attachment')) {
-            $file = $request->file('attachment');
-            $path = $file->store('attachments', 'public');
-
-            Attachment::create([
-                'incident_id' => $incident->id,
-                'filename' => $file->getClientOriginalName(),
-                'filepath' => $path,
-                'uploaded_by' => auth()->id(),
-                'uploaded_at' => now(),
+            $incident = Incident::create([
+                'title' => $data['title'],
+                'category' => $data['category'],
+                'severity' => $data['severity'],
+                'description' => $data['description'],
+                'status_id' => $statusNew->id,
+                'reporter_id' => auth()->id(),
             ]);
+
+            $incident->load('reporter');
+
+            User::where('role', 'admin')->each(function (User $admin) use ($incident) {
+                $admin->notify(new NewIncidentReportedNotification($incident));
+            });
+
+            if ($request->hasFile('attachment')) {
+                $file = $request->file('attachment');
+                $path = $file->store('attachments', 'public');
+
+                Attachment::create([
+                    'incident_id' => $incident->id,
+                    'filename' => $file->getClientOriginalName(),
+                    'filepath' => $path,
+                    'uploaded_by' => auth()->id(),
+                    'uploaded_at' => now(),
+                ]);
+
+                AuditLog::create([
+                    'incident_id' => $incident->id,
+                    'user_id' => auth()->id(),
+                    'action_type' => 'Attachment Uploaded',
+                    'details' => 'Uploaded attachment: ' . $file->getClientOriginalName(),
+                ]);
+            }
 
             AuditLog::create([
                 'incident_id' => $incident->id,
                 'user_id' => auth()->id(),
-                'action_type' => 'Attachment Uploaded',
-                'details' => 'Uploaded attachment: ' . $file->getClientOriginalName(),
+                'action_type' => 'Created',
+                'details' => 'Incident created',
             ]);
-        }
 
-        AuditLog::create([
-            'incident_id' => $incident->id,
-            'user_id' => auth()->id(),
-            'action_type' => 'Created',
-            'details' => 'Incident created',
-        ]);
-
-        return redirect()->route('incidents.index')
-            ->with('success', 'Incident submitted.');
-    });
-}
+            return redirect()->route('incidents.index')
+                ->with('success', 'Incident submitted.');
+        });
+    }
 
     public function show(Incident $incident)
     {
@@ -182,7 +182,10 @@ class IncidentController extends Controller
             return back()->with('error', 'This incident has already been assigned.');
         }
 
+        $assignedStatus = Status::where('name', 'Assigned')->firstOrFail();
+
         $incident->assigned_to = $request->officer_id;
+        $incident->status_id = $assignedStatus->id;
         $incident->save();
 
         $officer = User::findOrFail($request->officer_id);
@@ -191,12 +194,20 @@ class IncidentController extends Controller
             'incident_id' => $incident->id,
             'user_id' => auth()->id(),
             'action_type' => 'Assigned',
-            'details' => 'Assigned to ' . $officer->name,
+            'old_value' => 'New',
+            'new_value' => 'Assigned',
+            'details' => 'Assigned to ' . $officer->name . ' and status changed to Assigned',
         ]);
 
         $officer->notify(new OfficerAssignedNotification($incident));
 
-        return back()->with('success', 'Officer assigned successfully.');
+        if ($incident->reporter) {
+            $incident->reporter->notify(
+                new ReporterStatusUpdatedNotification($incident, 'Assigned')
+            );
+        }
+
+        return back()->with('success', 'Officer assigned and status updated to Assigned.');
     }
 
     public function updateStatus(Request $request, Incident $incident)
@@ -215,9 +226,9 @@ class IncidentController extends Controller
         $currentStatus = $incident->status;
 
         $allowedTransitions = [
-            'New' => ['In Review'],
-            'In Review' => ['Assigned'],
-            'Assigned' => ['Resolved'],
+            'New' => ['Assigned', 'Invalid'],
+            'Assigned' => ['In Review'],
+            'In Review' => ['Resolved', 'Invalid'],
             'Resolved' => ['Closed'],
             'Closed' => [],
             'Invalid' => [],
