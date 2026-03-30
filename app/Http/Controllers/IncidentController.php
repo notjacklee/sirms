@@ -151,7 +151,9 @@ class IncidentController extends Controller
             'auditLogs.user'
         );
 
-        return view('incidents.show', compact('incident'));
+        $statuses = Status::all();
+
+        return view('incidents.show', compact('incident', 'statuses'));
     }
 
     public function assigned()
@@ -210,10 +212,115 @@ class IncidentController extends Controller
         return back()->with('success', 'Officer assigned and status updated to Assigned.');
     }
 
+    public function edit(Incident $incident)
+    {
+        $user = auth()->user();
+
+        if ($user->role !== 'reporter' || $incident->reporter_id != $user->id) {
+            abort(403);
+        }
+
+        if (($incident->status->name ?? '') !== 'Rejected') {
+            return back()->with('error', 'Only rejected incidents can be resubmitted.');
+        }
+
+        return view('incidents.edit', compact('incident'));
+    }
+
+    public function update(Request $request, Incident $incident)
+    {
+        $user = auth()->user();
+
+        if ($user->role !== 'reporter' || $incident->reporter_id != $user->id) {
+            abort(403);
+        }
+
+        if (($incident->status->name ?? '') !== 'Rejected') {
+            return back()->with('error', 'Only rejected incidents can be resubmitted.');
+        }
+
+        $data = $request->validate([
+            'title' => 'required|string|max:200',
+            'category' => 'required|string|max:100',
+            'severity' => 'required|string',
+            'description' => 'required|string',
+            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:5120',
+        ]);
+
+        return DB::transaction(function () use ($request, $incident, $data) {
+            $oldStatus = $incident->status->name ?? 'Rejected';
+
+            $incident->title = $data['title'];
+            $incident->category = $data['category'];
+            $incident->severity = $data['severity'];
+            $incident->description = $data['description'];
+
+            $resubmittedStatus = Status::firstOrCreate(['name' => 'Resubmitted']);
+            $incident->status_id = $resubmittedStatus->id;
+
+            // keep same officer assigned
+            // DO NOT reset assigned_to here
+
+            // clear previous rejection data only
+            $incident->rejection_reason = null;
+            $incident->resolution_summary = null;
+
+            $incident->save();
+
+            if ($request->hasFile('attachment')) {
+                $file = $request->file('attachment');
+                $path = $file->store('attachments', 'public');
+
+                Attachment::create([
+                    'incident_id' => $incident->id,
+                    'filename' => $file->getClientOriginalName(),
+                    'filepath' => $path,
+                    'uploaded_by' => auth()->id(),
+                    'uploaded_at' => now(),
+                ]);
+
+                AuditLog::create([
+                    'incident_id' => $incident->id,
+                    'user_id' => auth()->id(),
+                    'action_type' => 'Attachment Uploaded',
+                    'details' => 'Uploaded new attachment during resubmission: ' . $file->getClientOriginalName(),
+                ]);
+            }
+
+            AuditLog::create([
+                'incident_id' => $incident->id,
+                'user_id' => auth()->id(),
+                'action_type' => 'Resubmitted',
+                'old_value' => $oldStatus,
+                'new_value' => 'Resubmitted',
+                'details' => 'Incident updated and resubmitted by reporter',
+            ]);
+
+            if ($incident->assignedTo) {
+                $incident->assignedTo->notify(
+                    new OfficerAssignedNotification($incident)
+                );
+            }
+
+            if ($incident->reporter) {
+                $incident->reporter->notify(
+                    new ReporterStatusUpdatedNotification($incident, 'Resubmitted')
+                );
+            }
+
+            return redirect()->route('incidents.index')
+                ->with('success', 'Incident resubmitted successfully.');
+        });
+    }
+
     public function updateStatus(Request $request, Incident $incident)
     {
         $request->validate([
             'status_id' => 'required|exists:statuses,id',
+            'investigation_notes' => 'nullable|string',
+            'action_taken' => 'nullable|string',
+            'resolution_summary' => 'nullable|string',
+            'rejection_reason' => 'nullable|string',
         ]);
 
         $user = auth()->user();
@@ -226,12 +333,13 @@ class IncidentController extends Controller
         $currentStatus = $incident->status;
 
         $allowedTransitions = [
-            'New' => ['Assigned', 'Invalid'],
-            'Assigned' => ['In Review'],
-            'In Review' => ['Resolved', 'Invalid'],
+            'New' => ['Assigned', 'Rejected'],
+            'Assigned' => ['In Review', 'Rejected'],
+            'In Review' => ['Resolved', 'Rejected'],
+            'Rejected' => ['Resubmitted'],
+            'Resubmitted' => ['In Review', 'Rejected'],
             'Resolved' => ['Closed'],
             'Closed' => [],
-            'Invalid' => [],
         ];
 
         $currentName = trim($currentStatus->name ?? '');
@@ -243,7 +351,37 @@ class IncidentController extends Controller
             isset($allowedTransitions[$currentName]) &&
             !in_array($newName, $allowedTransitions[$currentName])
         ) {
-            return back()->with('error', "Invalid status transition: {$currentName} → {$newName}");
+            return back()->with('error', "Invalid transition: {$currentName} → {$newName}");
+        }
+
+        if ($user->role === 'officer' && $newName === 'Closed') {
+            return back()->with('error', 'Officer cannot close incident');
+        }
+
+        if ($newName === 'Rejected') {
+            if (!$request->filled('rejection_reason')) {
+                return back()->with('error', 'Rejection reason is required');
+            }
+            $incident->rejection_reason = $request->rejection_reason;
+        } else {
+            $incident->rejection_reason = null;
+        }
+
+        if ($request->filled('investigation_notes')) {
+            $incident->investigation_notes = $request->investigation_notes;
+        }
+
+        if ($request->filled('action_taken')) {
+            $incident->action_taken = $request->action_taken;
+        }
+
+        if ($newName === 'Resolved') {
+            if (!$request->filled('resolution_summary')) {
+                return back()->with('error', 'Resolution summary is required');
+            }
+            $incident->resolution_summary = $request->resolution_summary;
+        } else {
+            $incident->resolution_summary = null;
         }
 
         $oldValue = $currentName;
@@ -253,11 +391,11 @@ class IncidentController extends Controller
 
         AuditLog::create([
             'incident_id' => $incident->id,
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
             'action_type' => 'Status Updated',
             'old_value' => $oldValue,
             'new_value' => $newName,
-            'details' => 'Changed status from ' . $oldValue . ' to ' . $newName,
+            'details' => 'Updated with investigation data',
         ]);
 
         if ($incident->reporter) {
@@ -266,7 +404,7 @@ class IncidentController extends Controller
             );
         }
 
-        return back()->with('success', 'Status updated.');
+        return back()->with('success', 'Status updated successfully.');
     }
 
     public function comment(Request $request, Incident $incident)
@@ -332,4 +470,29 @@ class IncidentController extends Controller
 
         return response()->download($path, $attachment->filename);
     }
+    public function close(Incident $incident)
+{
+    $user = auth()->user();
+
+    if ($user->role !== 'admin') {
+        return back()->with('error', 'Only admin can close incident');
+    }
+
+    $closedStatus = \App\Models\Status::where('name', 'Closed')->first();
+
+    $incident->status_id = $closedStatus->id;
+    $incident->save();
+
+    // audit log (optional but good)
+    \App\Models\AuditLog::create([
+        'incident_id' => $incident->id,
+        'user_id' => $user->id,
+        'action_type' => 'Closed',
+        'old_value' => 'Resolved',
+        'new_value' => 'Closed',
+        'details' => 'Incident closed by admin',
+    ]);
+
+    return back()->with('success', 'Incident closed successfully');
+}
 }

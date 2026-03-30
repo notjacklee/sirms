@@ -57,6 +57,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth', 'verified', 'role:reporter'])->group(function () {
     Route::get('/incidents/create', [IncidentController::class, 'create'])->name('incidents.create');
     Route::post('/incidents', [IncidentController::class, 'store'])->name('incidents.store');
+
+    // Reporter resubmit routes
+    Route::get('/incidents/{incident}/edit', [IncidentController::class, 'edit'])->name('incidents.edit');
+    Route::put('/incidents/{incident}', [IncidentController::class, 'update'])->name('incidents.update');
 });
 
 /*
@@ -94,6 +98,9 @@ Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
 
     Route::get('/admin/reports/incidents/pdf', [AdminController::class, 'exportPdf'])
         ->name('admin.reports.pdf');
+    Route::put('/incidents/{incident}/close', [IncidentController::class, 'close'])
+    ->name('incidents.close')
+    ->middleware(['auth', 'role:admin']);
 });
 
 /*

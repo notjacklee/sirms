@@ -10,32 +10,48 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // ✅ Seed statuses first
         $this->call([
             StatusSeeder::class,
         ]);
 
-        // Admin
-        User::create([
-            'name' => 'Admin',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('password123'),
-            'role' => 'admin',
-        ]);
+        // ✅ Admin
+        User::updateOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin',
+                'password' => Hash::make('password123'),
+                'role' => 'admin',
+            ]
+        );
 
-        // Reporter
-        User::create([
-            'name' => 'Reporter',
-            'email' => 'reporter@example.com',
-            'password' => Hash::make('password123'),
-            'role' => 'reporter',
-        ]);
+        // ✅ Reporter
+        User::updateOrCreate(
+            ['email' => 'reporter@example.com'],
+            [
+                'name' => 'Reporter',
+                'password' => Hash::make('password123'),
+                'role' => 'reporter',
+            ]
+        );
 
-        // Officer
-        User::create([
-            'name' => 'Officer',
-            'email' => 'officer@example.com',
-            'password' => Hash::make('password123'),
-            'role' => 'officer',
-        ]);
+        // ✅ Officer 1
+        User::updateOrCreate(
+            ['email' => 'officer@example.com'],
+            [
+                'name' => 'Officer 1',
+                'password' => Hash::make('password123'),
+                'role' => 'officer',
+            ]
+        );
+        // Officer 2
+        User::updateOrCreate(
+            ['email' => 'officer2@example.com'],
+            [
+                'name' => 'Officer 2',
+                'password' => Hash::make('password123'),
+                'role' => 'officer',
+            ]
+        );
     }
 }

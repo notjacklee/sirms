@@ -141,6 +141,7 @@
                         <th class="px-6 py-4 font-semibold text-slate-600">Severity</th>
                         <th class="px-6 py-4 font-semibold text-slate-600">Status</th>
                         <th class="px-6 py-4 font-semibold text-slate-600">Created</th>
+                        <th class="px-6 py-4 font-semibold text-slate-600">Action</th>
                     </tr>
                 </thead>
 
@@ -186,24 +187,28 @@
                                     <span class="inline-flex px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">
                                         {{ $statusName }}
                                     </span>
-                                @elseif($statusName === 'In Review')
+                                @elseif($statusName === 'Assigned')
                                     <span class="inline-flex px-3 py-1 text-xs font-semibold bg-purple-100 text-purple-700 rounded-full">
                                         {{ $statusName }}
                                     </span>
-                                @elseif($statusName === 'Assigned')
-                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-indigo-100 text-indigo-700 rounded-full">
+                                @elseif($statusName === 'In Review')
+                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-purple-200 text-purple-800 rounded-full">
+                                        {{ $statusName }}
+                                    </span>
+                                @elseif($statusName === 'Rejected')
+                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-red-100 text-red-700 rounded-full">
+                                        {{ $statusName }}
+                                    </span>
+                                @elseif($statusName === 'Resubmitted')
+                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">
                                         {{ $statusName }}
                                     </span>
                                 @elseif($statusName === 'Resolved')
-                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-green-100 text-green-700 rounded-full">
+                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-700 rounded-full">
                                         {{ $statusName }}
                                     </span>
                                 @elseif($statusName === 'Closed')
-                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-slate-200 text-slate-700 rounded-full">
-                                        {{ $statusName }}
-                                    </span>
-                                @elseif($statusName === 'Invalid')
-                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-red-100 text-red-700 rounded-full">
+                                    <span class="inline-flex px-3 py-1 text-xs font-semibold bg-green-100 text-green-700 rounded-full">
                                         {{ $statusName }}
                                     </span>
                                 @else
@@ -216,10 +221,21 @@
                             <td class="px-6 py-4 text-slate-500 whitespace-nowrap">
                                 {{ $incident->created_at->format('d M Y') }}
                             </td>
+
+                            <td class="px-6 py-4">
+                                @if(auth()->user()->role === 'reporter' && $statusName === 'Rejected')
+                                    <a href="{{ route('incidents.edit', $incident->id) }}"
+                                       class="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-600 transition">
+                                        Resubmit
+                                    </a>
+                                @else
+                                    <span class="text-slate-400 text-xs">—</span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-14 text-center text-slate-500">
+                            <td colspan="6" class="px-6 py-14 text-center text-slate-500">
                                 <div class="flex flex-col items-center space-y-4">
                                     <div class="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-2xl">
                                         📄

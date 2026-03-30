@@ -213,27 +213,31 @@
                                         </span>
                                     @endif
                                 </td>
+
                                 <td class="px-4 py-4">
                                     @php
-                                    $status = $incident->status->name ?? '';
+                                        $status = $incident->status->name ?? '';
                                     @endphp
 
                                     @if($status == 'New')
                                         <span class="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700">New</span>
-                                        @elseif($status == 'In Review')
-                                    <span class="px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">In Review</span>
-
                                     @elseif($status == 'Assigned')
-                                    <span class="px-3 py-1 text-xs rounded-full bg-purple-100 text-purple-700">Assigned</span>
-
+                                        <span class="px-3 py-1 text-xs rounded-full bg-purple-100 text-purple-700">Assigned</span>
+                                    @elseif($status == 'In Review')
+                                        <span class="px-3 py-1 text-xs rounded-full bg-purple-200 text-purple-800">In Review</span>
+                                    @elseif($status == 'Rejected')
+                                        <span class="px-3 py-1 text-xs rounded-full bg-red-100 text-red-700">Rejected</span>
+                                    @elseif($status == 'Resubmitted')
+                                        <span class="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700">Resubmitted</span>
                                     @elseif($status == 'Resolved')
-                                        <span class="px-3 py-1 text-xs rounded-full bg-green-100 text-green-700">Resolved</span>
+                                        <span class="px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Pending Closure</span>
                                     @elseif($status == 'Closed')
-                                        <span class="px-3 py-1 text-xs rounded-full bg-gray-800 text-white">Closed</span>
+                                        <span class="px-3 py-1 text-xs rounded-full bg-green-100 text-green-700">Closed</span>
                                     @else
-                                    <span class="px-3 py-1 text-xs rounded-full bg-gray-200">Unknown</span>
+                                        <span class="px-3 py-1 text-xs rounded-full bg-slate-100 text-slate-700">Unknown</span>
                                     @endif
                                 </td>
+
                                 <td class="px-4 py-4 min-w-[260px]">
                                     @if($incident->assignedTo)
                                         <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -258,7 +262,7 @@
                                                 </select>
 
                                                 <button type="submit"
-                                                onclick="return confirm('Assign this officer to investigate this incident?')"
+                                                        onclick="return confirm('Assign this officer to investigate this incident?')"
                                                         class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition">
                                                     Assign
                                                 </button>
@@ -267,12 +271,27 @@
                                     @endif
                                 </td>
 
-                                <td class="px-4 py-4">
-                                    <a href="{{ route('incidents.show', $incident) }}"
-                                       class="inline-flex rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-900 transition">
-                                        View
-                                    </a>
-                                </td>
+    <td class="px-4 py-4">
+    <div class="flex items-center gap-2">
+        <a href="{{ route('incidents.show', $incident) }}"
+           class="inline-flex justify-center min-w-[72px] rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-900 transition">
+            View
+        </a>
+
+        @if(($incident->status->name ?? '') === 'Resolved')
+            <form method="POST" action="{{ route('incidents.close', $incident) }}">
+                @csrf
+                @method('PUT')
+
+                <button type="submit"
+                    onclick="return confirm('Are you sure you want to CLOSE this incident?')"
+                    class="inline-flex justify-center min-w-[72px] rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 transition">
+                    Close
+                </button>
+            </form>
+        @endif
+    </div>
+</td>
                             </tr>
                         @empty
                             <tr>
@@ -283,9 +302,10 @@
                         @endforelse
                     </tbody>
                 </table>
+
                 <div class="p-4">
-    {{ $recent->links() }}
-</div>
+                    {{ $recent->links() }}
+                </div>
             </div>
         </div>
 

@@ -10,13 +10,25 @@ class StatusSeeder extends Seeder
 {
     public function run(): void
     {
-        $statuses = ['New', 'In Review', 'Assigned', 'Resolved', 'Closed', 'Invalid'];
+        $statuses = [
+            'New',
+            'Assigned',
+            'In Review',
+            'Rejected',
+            'Resubmitted',
+            'Resolved',
+            'Closed'
+        ];
+
         $now = Carbon::now();
 
-        foreach ($statuses as $s) {
+        foreach ($statuses as $status) {
             DB::table('statuses')->updateOrInsert(
-                ['name' => $s],
-                ['created_at' => $now, 'updated_at' => $now]
+                ['name' => $status],
+                [
+                    'created_at' => $now,
+                    'updated_at' => $now
+                ]
             );
         }
     }
